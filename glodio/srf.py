@@ -18,13 +18,26 @@ from glodio.netcdfcommon import (
     get_valid_metric_units,
 )
 
+def _is_stringy(da) -> bool:
+    dtype = da.dtype
+    if dtype.kind in ("U", "S"):
+        return True
+    if hasattr(np, "dtypes") and hasattr(np.dtypes, "StringDType"):
+        if isinstance(dtype, np.dtypes.StringDType):
+            return True
+    if dtype.kind == "O":
+        return all(isinstance(x, str) for x in da.values.flat)
+    return False
+
+_check_stringy = pa.Check(_is_stringy, error="Data array must be of type string/bytes")
+
 _UNITS_REGEX = "^(?:" + "|".join(re.escape(v) for v in get_valid_metric_units()) + ")$"
 
 _SRF_SCHEMA = pa.DatasetSchema(
     data_vars={ # TODO check if None works in pandera
         "srf": pa.DataArraySchema(np.floating, dims=[None, "channel"]),
         "wavelength": pa.DataArraySchema(np.floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}),
-        "channel_id": pa.DataArraySchema(np.character), # TODO check if works
+        "channel_id": pa.DataArraySchema(checks=_check_stringy), # TODO check if works
     },
     coords={"channel": pa.DataArraySchema(np.floating)},
 )
@@ -37,7 +50,7 @@ _SRF_OTHER_SCHEMAS = [
         },
         coords={
             "channel": pa.DataArraySchema(np.floating),
-            "channel_id": pa.DataArraySchema(np.character),
+            "channel_id": pa.DataArraySchema(checks=_check_stringy),
         },
     ),
     pa.DatasetSchema(
@@ -45,13 +58,13 @@ _SRF_OTHER_SCHEMAS = [
             "srf": pa.DataArraySchema(np.floating, dims=[None, None]),
             "wavelength": pa.DataArraySchema(np.floating, dims=[None, None], attrs={"units": _UNITS_REGEX}),
             "channel": pa.DataArraySchema(np.floating),
-            "channel_id": pa.DataArraySchema(np.character),
+            "channel_id": pa.DataArraySchema(checks=_check_stringy),
         },
     ),
     pa.DatasetSchema(
         data_vars={
             "srf": pa.DataArraySchema(np.floating, dims=[None, "wavelength"]),
-            "channel_id": pa.DataArraySchema(np.character),
+            "channel_id": pa.DataArraySchema(checks=_check_stringy),
         },
         coords={
             "channel": pa.DataArraySchema(np.floating),
