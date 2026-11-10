@@ -1,11 +1,13 @@
 """
-This module contains the functionality that read Spectral Response Function files
+This module contains the functionality that validates Spectral Response Function files
 from GLOD format files.
 
 It exports the following functions:
-    * read_srf - Read a glod-formatted netcdf srf file.
+    * validate_srf: Validates that a xarray dataset follows the SRF schema.
 """
-import os
+from typing import Union
+from pathlib import Path
+import re
 
 import numpy as np
 import xarray as xr
@@ -13,17 +15,53 @@ import pandera.xarray as pa
 
 from glodio.netcdfcommon import (
     validate_schema,
-    xr_open_dataset,
-    get_length_conversion_factor,
+    get_valid_metric_units,
 )
 
+_UNITS_REGEX = "^(?:" + "|".join(re.escape(v) for v in get_valid_metric_units()) + ")$"
 
-_READ_FILE_ERROR_STR = (
-    "There was a problem while loading the SRF file. See log for details."
+_SRF_SCHEMA = pa.DatasetSchema(
+    data_vars={ # TODO check if None works in pandera
+        "srf": pa.DataArraySchema(np.floating, dims=[None, "channel"]),
+        "wavelength": pa.DataArraySchema(np.floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}),
+        "channel_id": pa.DataArraySchema(np.character), # TODO check if works
+    },
+    coords={"channel": pa.DataArraySchema(np.floating)},
 )
 
+_SRF_OTHER_SCHEMAS = [
+    pa.DatasetSchema(
+        data_vars={
+            "srf": pa.DataArraySchema(np.floating, dims=[None, "channel"]),
+            "wavelength": pa.DataArraySchema(np.floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}),
+        },
+        coords={
+            "channel": pa.DataArraySchema(np.floating),
+            "channel_id": pa.DataArraySchema(np.character),
+        },
+    ),
+    pa.DatasetSchema(
+        data_vars={
+            "srf": pa.DataArraySchema(np.floating, dims=[None, None]),
+            "wavelength": pa.DataArraySchema(np.floating, dims=[None, None], attrs={"units": _UNITS_REGEX}),
+            "channel": pa.DataArraySchema(np.floating),
+            "channel_id": pa.DataArraySchema(np.character),
+        },
+    ),
+    pa.DatasetSchema(
+        data_vars={
+            "srf": pa.DataArraySchema(np.floating, dims=[None, "wavelength"]),
+            "channel_id": pa.DataArraySchema(np.character),
+        },
+        coords={
+            "channel": pa.DataArraySchema(np.floating),
+            "wavelength": pa.DataArraySchema(np.floating, attrs={"units": _UNITS_REGEX}),
+        },
+    ),
+]
 
-def _validate_schema_srf(ds: xr.Dataset):
+
+def _validate_schema_srf(ds: xr.Dataset, strict: bool = False):
     """Validates that a xarray dataset follows the SRF schema.
 
     The dataset structure is:
@@ -36,93 +74,43 @@ def _validate_schema_srf(ds: xr.Dataset):
     ----------
     ds: xr.Dataset
         Dataset to validate
+    strict: bool
+        Flag to specify if the check must be exact to the desired schema, or if
+        it can pass if it would work in most cases.
     """
-    def get_data_vars(channel_dim: str = "channel", sample_dim=None):
-        data_vars = {
-            "srf": pa.DataArraySchema(np.floating, dims=[sample_dim, channel_dim]),
-            "wavelength": pa.DataArraySchema(np.floating, dims=[sample_dim, channel_dim]),
-        }
-        return data_vars
+    schema = _SRF_SCHEMA
+    if strict:
+        validate_schema(schema, ds)
+    else:
+        validate_schema(schema, ds, _SRF_OTHER_SCHEMAS)
 
-    coords = {"channel": pa.DataArraySchema(np.floating)}
-    channel_id = {"channel_id": pa.DataArraySchema(np.character)} # TODO check if works
-    # channel_id can actually be either a variable or a coordinate, preferably a variable.
-    dss = pa.DatasetSchema(
-        data_vars=get_data_vars() | channel_id,
-        coords=coords,
-    )
-    odss = pa.DatasetSchema(
-        data_vars=get_data_vars(),
-        coords=coords | channel_id,
-    )
-    # channel can be a variable, then there are no coordinates
-    flex_dss = pa.DatasetSchema(
-        data_vars=get_data_vars(None) | channel_id | coords,
-    )
-    # wavelength can be a coordinate instead of sample_dim
-    wlen_coord = {"wavelength": pa.DataArraySchema(np.floating)}
-    data_vars = get_data_vars(sample_dim="wavelength") | channel_id
-    data_vars.pop("wavelength")
-    wcoorddss = pa.DatasetSchema(
-        data_vars=data_vars,
-        coords=coords | wlen_coord,
-    )
-    validate_schema(dss, ds, [odss, flex_dss, wcoorddss])
-
-
-def read_srf(filepath: str) -> SpectralResponseFunction:
-    """
-    Read a glod-formatted netcdf srf file and create a SpectralResponseFunction data object
-    from it.
+def validate_srf(data: Union[xr.Dataset, str, Path], strict: bool = False) -> None:
+    """Validates that a dataset follows the SRF schema.
 
     Parameters
     ----------
-    filepath: str
-        Path where the file is located.
+    data : xr.Dataset or str or pathlib.Path
+        Dataset to validate, or path to a NetCDF file that will be opened
+        and validated. If a path is given, the file is opened in read-only
+        mode and closed before returning.
+    strict : bool
+        Flag to specify if the check must be exact to the desired schema, or
+        if it can pass if it would work in most cases.
 
-    Returns
-    -------
-    srf: SpectralResponseFunction
-        Generated SpectralResponseFunction data object.
+    Raises
+    ------
+    TypeError
+        If ``data`` is neither an ``xr.Dataset``, ``str`` nor ``Path``.
+    ValueError
+        If the dataset does not conform to any of the accepted SRF schemas.
     """
-    try:
-        ds = xr_open_dataset(filepath)
-        _validate_schema_srf(ds)
-        n_channels = len(ds["channel"])
-        wvlens = [[] for _ in range(n_channels)]
-        factors = [[] for _ in range(n_channels)]
-        wlen_units = "nm"
-        if hasattr(ds["wavelength"], "units"):
-            wlen_units: str = ds["wavelength"].units
-        f_to_nm = get_length_conversion_factor(wlen_units, "nm")
-        if ds["wavelength"].ndim == 1:
-            same_arr = ds["wavelength"].values * f_to_nm
-            for i in range(n_channels):
-                wvlens[i] = same_arr[~np.isnan(same_arr)]
-        else:
-            wvlen_arr = (ds["wavelength"].values * f_to_nm).T
-            for i in range(n_channels):
-                wvlens[i] = wvlen_arr[i][~np.isnan(wvlen_arr[i])]
-        factor_arr = ds["srf"].values.T
-        for i in range(n_channels):
-            factors[i] = factor_arr[i][~np.isnan(factor_arr[i])]
-        channels = []
-        ch_units = "nm"
-        if hasattr(ds["channel"], "units"):
-            ch_units: str = ds["channel"].units
-        ch_f_to_nm = get_length_conversion_factor(ch_units, "nm")
-        for i in range(n_channels):
-            channel_spec_resp = dict(zip(wvlens[i], factors[i]))
-            center = float(ds["channel"][i].data) * ch_f_to_nm
-            c_id = str(ds["channel_id"][i].values.astype(str))
-            channel = SRFChannel(center, c_id, channel_spec_resp)
-            channels.append(channel)
-        name = os.path.basename(filepath)
-        srf = SpectralResponseFunction(name, channels)
-    except pa.errors.SchemaError as e:
-        raise e
-    except Exception as e:
-        raise Exception(_READ_FILE_ERROR_STR) from e
-    finally:
-        ds.close()
-    return srf
+    if isinstance(data, (str, Path)):
+        with xr.open_dataset(data) as ds:
+            _validate_schema_srf(ds, strict=strict)
+    elif isinstance(data, xr.Dataset):
+        _validate_schema_srf(data, strict=strict)
+    else:
+        raise TypeError(
+            f"validate_srf expected xr.Dataset, str or Path, "
+            f"got {type(data).__name__}"
+        )

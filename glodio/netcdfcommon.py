@@ -1,9 +1,37 @@
 """Common functionalities for reading netCDF files with `xarray`."""
-from typing import Iterable, Mapping, Union
+from typing import Iterable, Mapping, Union, Dict, List
 
 import numpy as np
 import xarray as xr
 import pandera.xarray as pa
+
+
+def _gen_unit_variations(basename: str) -> List[str]:
+        """Generate common variations of a metric unit (American & British spellings)."""
+        return [
+            f"{basename}metre",  # "metre" (British English)
+            f"{basename}meter",  # "meter" (American English)
+            f"{basename}metres",  # "metres" (plural British)
+            f"{basename}meters",  # "meters" (plural American)
+        ]
+
+
+def _get_metric_factors() -> Dict[str, int]:
+    # Build the metric factors dictionary efficiently
+    metric_factors = {
+        **dict.fromkeys(("nm", *_gen_unit_variations("nano")), -9),
+        **dict.fromkeys(("um", "μm", *_gen_unit_variations("micro")), -6),
+        **dict.fromkeys(("mm", *_gen_unit_variations("milli")), -3),
+        **dict.fromkeys(("cm", *_gen_unit_variations("centi")), -2),
+        **dict.fromkeys(("m", *_gen_unit_variations("")), 0),
+        **dict.fromkeys(("km", *_gen_unit_variations("kilo")), 3),
+    }
+    return metric_factors
+
+
+def get_valid_metric_units() -> List[str]:
+    metric_factors = _get_metric_factors()
+    return list(metric_factors.keys())
 
 
 def get_length_conversion_factor(from_unit: str, to_unit: str) -> float:
@@ -32,25 +60,7 @@ def get_length_conversion_factor(from_unit: str, to_unit: str) -> float:
     ValueError
         If either `from_unit` or `to_unit` is not a recognized metric length unit.
     """
-
-    def _gen_unit_variations(basename: str) -> list[str]:
-        """Generate common variations of a metric unit (American & British spellings)."""
-        return [
-            f"{basename}metre",  # "metre" (British English)
-            f"{basename}meter",  # "meter" (American English)
-            f"{basename}metres",  # "metres" (plural British)
-            f"{basename}meters",  # "meters" (plural American)
-        ]
-
-    # Build the metric factors dictionary efficiently
-    metric_factors = {
-        **dict.fromkeys(("nm", *_gen_unit_variations("nano")), -9),
-        **dict.fromkeys(("um", "μm", *_gen_unit_variations("micro")), -6),
-        **dict.fromkeys(("mm", *_gen_unit_variations("milli")), -3),
-        **dict.fromkeys(("cm", *_gen_unit_variations("centi")), -2),
-        **dict.fromkeys(("m", *_gen_unit_variations("")), 0),
-        **dict.fromkeys(("km", *_gen_unit_variations("kilo")), 3),
-    }
+    metric_factors = _get_metric_factors()
     if from_unit not in metric_factors:
         raise ValueError(
             f"Unsupported unit: {from_unit} or {to_unit}. Supported units: {list(metric_factors.keys())}"
