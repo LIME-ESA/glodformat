@@ -15,49 +15,53 @@ import pandera.xarray as pa
 from glodformat.netcdfcommon import (
     validate_schema,
     get_valid_metric_units,
+    check_stringy,
+    check_floating,
 )
+
+_check_shape_1 = pa.Check(lambda da: da.size == 1, error="Coordinate 'date' must have exactly one element.")
 
 _UNITS_REGEX = "^(?:" + "|".join(re.escape(v) for v in get_valid_metric_units()) + ")$"
 
 _LUNAR_OBS_SCHEMA = pa.DatasetSchema(
     data_vars = {
-        "channel_name": pa.DataArraySchema(np.generic, dims=["chan"]),
-        "sat_pos": pa.DataArraySchema(np.floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
-        "sat_pos_ref": pa.DataArraySchema(np.generic, dims=[]),
-        "irr_obs": pa.DataArraySchema(np.floating, dims=["chan"]),
+        "channel_name": pa.DataArraySchema(checks=check_stringy, dims=["chan"]),
+        "sat_pos": pa.DataArraySchema(checks=check_floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
+        "sat_pos_ref": pa.DataArraySchema(checks=check_stringy, dims=[]),
+        "irr_obs": pa.DataArraySchema(checks=check_floating, dims=["chan"], nullable=True),
     },
-    coords = {"date": pa.DataArraySchema(np.datetime64, shape=(1,))},
+    coords = {"date": pa.Coordinate(np.datetime64, checks=_check_shape_1)},
     attrs = {"data_source": lambda _: True},
 )
 
 _LUNAR_OBS_OTHER_SCHEMAS = [
     pa.DatasetSchema(
         data_vars = {
-            "channel_name": pa.DataArraySchema(np.generic, dims=["chan"]),
-            "sat_pos": pa.DataArraySchema(np.floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
-            "sat_pos_ref": pa.DataArraySchema(np.generic, dims=[]),
-            "irr_obs": pa.DataArraySchema(np.floating, dims=["chan"]),
+            "channel_name": pa.DataArraySchema(checks=check_stringy, dims=["chan"]),
+            "sat_pos": pa.DataArraySchema(checks=check_floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
+            "sat_pos_ref": pa.DataArraySchema(checks=check_stringy, dims=[]),
+            "irr_obs": pa.DataArraySchema(checks=check_floating, dims=["chan"], nullable=True),
         },
-        coords = {"date": pa.DataArraySchema(np.floating, shape=(1,))},
+        coords = {"date": pa.Coordinate(checks=[check_floating, _check_shape_1])},
         attrs = {"data_source": lambda _: True},
     ),
     pa.DatasetSchema(
         data_vars = {
-            "channel_name": pa.DataArraySchema(np.generic, dims=["chan"]),
-            "sat_pos": pa.DataArraySchema(np.floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
-            "sat_pos_ref": pa.DataArraySchema(np.generic, dims=[]),
-            "irr_obs": pa.DataArraySchema(np.floating, dims=["chan"]),
+            "channel_name": pa.DataArraySchema(checks=check_stringy, dims=["chan"]),
+            "sat_pos": pa.DataArraySchema(checks=check_floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
+            "sat_pos_ref": pa.DataArraySchema(checks=check_stringy, dims=[]),
+            "irr_obs": pa.DataArraySchema(checks=check_floating, dims=["chan"], nullable=True),
             "date": pa.DataArraySchema(np.datetime64, shape=(1,)),
         },
         attrs = {"data_source": lambda _: True},
     ),
     pa.DatasetSchema(
         data_vars = {
-            "channel_name": pa.DataArraySchema(np.generic, dims=["chan"]),
-            "sat_pos": pa.DataArraySchema(np.floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
-            "sat_pos_ref": pa.DataArraySchema(np.generic, dims=[]),
-            "irr_obs": pa.DataArraySchema(np.floating, dims=["chan"]),
-            "date": pa.DataArraySchema(np.floating, shape=(1,)),
+            "channel_name": pa.DataArraySchema(checks=check_stringy, dims=["chan"]),
+            "sat_pos": pa.DataArraySchema(checks=check_floating, shape=(3,), dims=["sat_xyz"], attrs={"units": _UNITS_REGEX}),
+            "sat_pos_ref": pa.DataArraySchema(checks=check_stringy, dims=[]),
+            "irr_obs": pa.DataArraySchema(checks=check_floating, dims=["chan"], nullable=True),
+            "date": pa.DataArraySchema(checks=check_floating, shape=(1,)),
         },
         attrs = {"data_source": lambda _: True},
     ),

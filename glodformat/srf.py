@@ -16,60 +16,53 @@ import pandera.xarray as pa
 from glodformat.netcdfcommon import (
     validate_schema,
     get_valid_metric_units,
+    check_floating,
+    check_stringy
 )
 
-def _is_stringy(da) -> bool:
-    dtype = da.dtype
-    if dtype.kind in ("U", "S"):
-        return True
-    if hasattr(np, "dtypes") and hasattr(np.dtypes, "StringDType"):
-        if isinstance(dtype, np.dtypes.StringDType):
-            return True
-    if dtype.kind == "O":
-        return all(isinstance(x, str) for x in da.values.flat)
-    return False
-
-_check_stringy = pa.Check(_is_stringy, error="Data array must be of type string/bytes")
 
 _UNITS_REGEX = "^(?:" + "|".join(re.escape(v) for v in get_valid_metric_units()) + ")$"
 
 _SRF_SCHEMA = pa.DatasetSchema(
     data_vars={ # TODO check if None works in pandera
-        "srf": pa.DataArraySchema(np.floating, dims=[None, "channel"]),
-        "wavelength": pa.DataArraySchema(np.floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}),
-        "channel_id": pa.DataArraySchema(checks=_check_stringy), # TODO check if works
+        "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], nullable=True),
+        "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}, nullable=True),
+        "channel_id": pa.DataArraySchema(checks=check_stringy), # TODO check if works
     },
-    coords={"channel": pa.DataArraySchema(np.floating)},
+    coords={"channel": pa.Coordinate(checks=check_floating)},
 )
 
 _SRF_OTHER_SCHEMAS = [
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(np.floating, dims=[None, "channel"]),
-            "wavelength": pa.DataArraySchema(np.floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}),
+            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], nullable=True),
+            "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}, nullable=True),
         },
         coords={
-            "channel": pa.DataArraySchema(np.floating),
-            "channel_id": pa.DataArraySchema(checks=_check_stringy),
+            "channel": pa.Coordinate(checks=check_floating),
+            "channel_id": pa.Coordinate(checks=check_stringy),
         },
     ),
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(np.floating, dims=[None, None]),
-            "wavelength": pa.DataArraySchema(np.floating, dims=[None, None], attrs={"units": _UNITS_REGEX}),
-            "channel": pa.DataArraySchema(np.floating),
-            "channel_id": pa.DataArraySchema(checks=_check_stringy),
+            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, None], nullable=True),
+            "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, None], attrs={"units": _UNITS_REGEX}, nullable=True),
+            "channel": pa.DataArraySchema(checks=check_floating),
+            "channel_id": pa.DataArraySchema(checks=check_stringy),
         },
     ),
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(np.floating, dims=[None, "wavelength"]),
-            "channel_id": pa.DataArraySchema(checks=_check_stringy),
+            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "wavelength"], nullable=True),
+            "channel_id": pa.DataArraySchema(checks=check_stringy),
         },
         coords={
-            "channel": pa.DataArraySchema(np.floating),
-            "wavelength": pa.DataArraySchema(np.floating, attrs={"units": _UNITS_REGEX}),
+            "channel": pa.Coordinate(checks=check_floating),
+            "wavelength": pa.Coordinate(checks=check_floating, nullable=True),
         },
+        checks=[
+            pa.Check(lambda ds: re.match(_UNITS_REGEX, ds.coords['wavelength'].attrs.get("units", '')))
+        ]
     ),
 ]
 

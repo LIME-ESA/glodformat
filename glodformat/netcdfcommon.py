@@ -5,6 +5,26 @@ import numpy as np
 import xarray as xr
 import pandera.xarray as pa
 
+def _is_stringy(da) -> bool:
+    dtype = da.dtype
+    if dtype.kind in ("U", "S"):
+        return True
+    if hasattr(np, "dtypes") and hasattr(np.dtypes, "StringDType"):
+        if isinstance(dtype, np.dtypes.StringDType):
+            return True
+    if dtype.kind == "O":
+        return all(isinstance(x, str) for x in da.values.flat)
+    return False
+
+check_stringy = pa.Check(_is_stringy, error="Data array must be of type string/bytes")
+
+def _is_floating(da) -> bool:
+    return da.dtype.kind == "f"
+
+check_floating = pa.Check(
+    _is_floating,
+    error="Data array must have a floating-point dtype (e.g. float32, float64)."
+)
 
 def _gen_unit_variations(basename: str) -> List[str]:
         """Generate common variations of a metric unit (American & British spellings)."""
