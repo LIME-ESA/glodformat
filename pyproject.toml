@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "glodformat"
 dynamic = ["version"]
-description = "Satellite position calculator using EO-CFI orbit data (TLE/OSF)"
+description = "Reader and diagnostics toolkit for GLOD netCDF files, LIME-specific LGLOD files, and SRF observations."
 readme = "README.md"
-#license = "LGPL-3.0-only"
-#license-files = ["LICENSE"]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
     { name = "Javier Gatón Herguedas", email = "gaton@goa.uva.es" },
 ]
