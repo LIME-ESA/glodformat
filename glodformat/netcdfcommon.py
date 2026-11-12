@@ -1,9 +1,12 @@
 """Common functionalities for reading netCDF files with `xarray`."""
 from typing import Iterable, Mapping, Union, Dict, List
+from pathlib import Path
+from contextlib import nullcontext
 
 import numpy as np
 import xarray as xr
 import pandera.xarray as pa
+
 
 def _is_stringy(da) -> bool:
     dtype = da.dtype
@@ -16,24 +19,28 @@ def _is_stringy(da) -> bool:
         return all(isinstance(x, str) for x in da.values.flat)
     return False
 
+
 check_stringy = pa.Check(_is_stringy, error="Data array must be of type string/bytes")
+
 
 def _is_floating(da) -> bool:
     return da.dtype.kind == "f"
 
+
 check_floating = pa.Check(
     _is_floating,
-    error="Data array must have a floating-point dtype (e.g. float32, float64)."
+    error="Data array must have a floating-point dtype (e.g. float32, float64).",
 )
 
+
 def _gen_unit_variations(basename: str) -> List[str]:
-        """Generate common variations of a metric unit (American & British spellings)."""
-        return [
-            f"{basename}metre",  # "metre" (British English)
-            f"{basename}meter",  # "meter" (American English)
-            f"{basename}metres",  # "metres" (plural British)
-            f"{basename}meters",  # "meters" (plural American)
-        ]
+    """Generate common variations of a metric unit (American & British spellings)."""
+    return [
+        f"{basename}metre",  # "metre" (British English)
+        f"{basename}meter",  # "meter" (American English)
+        f"{basename}metres",  # "metres" (plural British)
+        f"{basename}meters",  # "meters" (plural American)
+    ]
 
 
 def _get_metric_factors() -> Dict[str, int]:
@@ -142,7 +149,9 @@ def xr_open_dataset(
 
 
 def validate_schema(
-    dss: pa.DatasetSchema, ds: xr.Dataset, other_schemas: Iterable[pa.DatasetSchema] = None
+    dss: pa.DatasetSchema,
+    ds: xr.Dataset,
+    other_schemas: Iterable[pa.DatasetSchema] = None,
 ):
     """Validates the dataset `ds` against the schema `dss`.
 
@@ -170,3 +179,12 @@ def validate_schema(
             except pa.errors.SchemaError:
                 pass
     dss.validate(ds, lazy=True)
+
+
+def _as_ctx(data: Union[xr.Dataset, str, Path]):
+    """Returns a context manager that produces an xr.Dataset."""
+    if isinstance(data, (str, Path)):
+        return xr.open_dataset(data)
+    if isinstance(data, xr.Dataset):
+        return nullcontext(data)
+    raise TypeError(f"expected xr.Dataset, str or Path, got {type(data).__name__}")

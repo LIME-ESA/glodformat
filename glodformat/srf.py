@@ -17,17 +17,26 @@ from glodformat.netcdfcommon import (
     validate_schema,
     get_valid_metric_units,
     check_floating,
-    check_stringy
+    check_stringy,
+    _as_ctx,
 )
+from glodformat import moon
 
 
 _UNITS_REGEX = "^(?:" + "|".join(re.escape(v) for v in get_valid_metric_units()) + ")$"
 
 _SRF_SCHEMA = pa.DatasetSchema(
-    data_vars={ # TODO check if None works in pandera
-        "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], nullable=True),
-        "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}, nullable=True),
-        "channel_id": pa.DataArraySchema(checks=check_stringy), # TODO check if works
+    data_vars={  # TODO check if None works in pandera
+        "srf": pa.DataArraySchema(
+            checks=check_floating, dims=[None, "channel"], nullable=True
+        ),
+        "wavelength": pa.DataArraySchema(
+            checks=check_floating,
+            dims=[None, "channel"],
+            attrs={"units": _UNITS_REGEX},
+            nullable=True,
+        ),
+        "channel_id": pa.DataArraySchema(checks=check_stringy),  # TODO check if works
     },
     coords={"channel": pa.Coordinate(checks=check_floating)},
 )
@@ -35,8 +44,15 @@ _SRF_SCHEMA = pa.DatasetSchema(
 _SRF_OTHER_SCHEMAS = [
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], nullable=True),
-            "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, "channel"], attrs={"units": _UNITS_REGEX}, nullable=True),
+            "srf": pa.DataArraySchema(
+                checks=check_floating, dims=[None, "channel"], nullable=True
+            ),
+            "wavelength": pa.DataArraySchema(
+                checks=check_floating,
+                dims=[None, "channel"],
+                attrs={"units": _UNITS_REGEX},
+                nullable=True,
+            ),
         },
         coords={
             "channel": pa.Coordinate(checks=check_floating),
@@ -45,15 +61,24 @@ _SRF_OTHER_SCHEMAS = [
     ),
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, None], nullable=True),
-            "wavelength": pa.DataArraySchema(checks=check_floating, dims=[None, None], attrs={"units": _UNITS_REGEX}, nullable=True),
+            "srf": pa.DataArraySchema(
+                checks=check_floating, dims=[None, None], nullable=True
+            ),
+            "wavelength": pa.DataArraySchema(
+                checks=check_floating,
+                dims=[None, None],
+                attrs={"units": _UNITS_REGEX},
+                nullable=True,
+            ),
             "channel": pa.DataArraySchema(checks=check_floating),
             "channel_id": pa.DataArraySchema(checks=check_stringy),
         },
     ),
     pa.DatasetSchema(
         data_vars={
-            "srf": pa.DataArraySchema(checks=check_floating, dims=[None, "wavelength"], nullable=True),
+            "srf": pa.DataArraySchema(
+                checks=check_floating, dims=[None, "wavelength"], nullable=True
+            ),
             "channel_id": pa.DataArraySchema(checks=check_stringy),
         },
         coords={
@@ -61,8 +86,12 @@ _SRF_OTHER_SCHEMAS = [
             "wavelength": pa.Coordinate(checks=check_floating, nullable=True),
         },
         checks=[
-            pa.Check(lambda ds: re.match(_UNITS_REGEX, ds.coords['wavelength'].attrs.get("units", '')))
-        ]
+            pa.Check(
+                lambda ds: re.match(
+                    _UNITS_REGEX, ds.coords["wavelength"].attrs.get("units", "")
+                )
+            )
+        ],
     ),
 ]
 
@@ -90,6 +119,7 @@ def _validate_schema_srf(ds: xr.Dataset, strict: bool = False):
     else:
         validate_schema(schema, ds, _SRF_OTHER_SCHEMAS)
 
+
 def validate_srf(data: Union[xr.Dataset, str, Path], strict: bool = False) -> None:
     """Validates that a dataset follows the SRF schema.
 
@@ -110,13 +140,66 @@ def validate_srf(data: Union[xr.Dataset, str, Path], strict: bool = False) -> No
     ValueError
         If the dataset does not conform to any of the accepted SRF schemas.
     """
-    if isinstance(data, (str, Path)):
-        with xr.open_dataset(data) as ds:
-            _validate_schema_srf(ds, strict=strict)
-    elif isinstance(data, xr.Dataset):
-        _validate_schema_srf(data, strict=strict)
-    else:
-        raise TypeError(
-            f"validate_srf expected xr.Dataset, str or Path, "
-            f"got {type(data).__name__}"
-        )
+    with _as_ctx(data) as ds:
+        _validate_schema_srf(ds, strict=strict)
+
+
+def _validate_srf_for_obs(ds_srf: xr.Dataset, ds_obs: xr.Dataset) -> None:
+    def _channels(da: xr.DataArray) -> set[str]:
+        values = da.values
+        if values.dtype.kind == "S":  # bytes -> str
+            values = np.char.decode(values, "utf-8")
+        return {str(v).rstrip("\x00") for v in values}
+
+    obs_ch_names = _channels(ds_obs["channel_name"])
+    srf_channel_ids = _channels(ds_srf["channel_id"])
+
+    missing = obs_ch_names - srf_channel_ids
+    if not missing:
+        return
+
+    raise pa.errors.SchemaError(
+        schema=ds_srf,
+        data=ds_obs,
+        message=(
+            "SRF is missing channel_ids required by the observation data: "
+            f"{sorted(missing)}"
+        ),
+        check="srf_contains_obs_channels",
+        reason_code="DATA",
+    )
+
+
+def validate_srf_for_obs(
+    srf_data: Union[xr.Dataset, str, Path],
+    obs_data: Union[xr.Dataset, str, Path],
+    strict: bool = False,
+) -> None:
+    """Validates that a SRF dataset correctly represents the channels of an observation dataset.
+
+    Parameters
+    ----------
+    srf_data : xr.Dataset or str or pathlib.Path
+        SRF Dataset to validate, or path to a NetCDF file that will be opened
+        and validated. If a path is given, the file is opened in read-only
+        mode and closed before returning.
+    obs_data : xr.Dataset or str or pathlib.Path
+        Observation Dataset to validate, or path to a NetCDF file that will be opened
+        and validated. If a path is given, the file is opened in read-only
+        mode and closed before returning.
+    strict : bool
+        Prior to checking the channels, both datasets are validated independently.
+        This flag specifies if the check must be exact to the desired schema,
+        or if it can pass if it would work in most cases.
+
+    Raises
+    ------
+    TypeError
+        If ``data`` is neither an ``xr.Dataset``, ``str`` nor ``Path``.
+    ValueError
+        If the dataset does not conform to any of the accepted SRF schemas.
+    """
+    validate_srf(srf_data, strict)
+    moon.validate_moon_observation(obs_data, strict)
+    with _as_ctx(srf_data) as ds_srf, _as_ctx(obs_data) as ds_obs:
+        _validate_srf_for_obs(ds_srf, ds_obs)
