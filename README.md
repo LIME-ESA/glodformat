@@ -1,4 +1,4 @@
-[![Version 0.0.0](https://img.shields.io/badge/version-0.0.0-informational?style=for-the-badge)](https://github.com/LIME-ESA/glodformat/tags)
+[![Version 0.0.1](https://img.shields.io/badge/version-0.0.1-informational?style=for-the-badge)](https://github.com/LIME-ESA/glodformat/tags)
 [![License: LGPL 3.0][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Stargazers][stars-shield]][stars-url]
