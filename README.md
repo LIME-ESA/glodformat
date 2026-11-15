@@ -93,7 +93,14 @@ pip install -e .
 
 ## Usage
 
-Work in progress
+```python
+import glodformat
+
+# Functions accept both paths or loaded xarray datasets
+glodformat.validate_srf("response.nc")
+glodformat.validate_moon_observation("moon_obs.nc")
+glodformat.validate_srf_for_obs("response.nc", "moon_obs.nc")
+```
 
 ## Roadmap
 
