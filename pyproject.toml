@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "glodformat"
 dynamic = ["version"]
-description = "Reader and diagnostics toolkit for GLOD netCDF files, LIME-specific LGLOD files, and SRF observations."
+description = "Reader and diagnostics toolkit for GLOD-based netCDF files."
 readme = "README.md"
 license = "LGPL-3.0-only"
 license-files = ["LICENSE"]
