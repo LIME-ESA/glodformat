@@ -13,7 +13,7 @@
   <h3 align="center">glodformat</h3>
 
   <p align="center">
-    Reader and diagnostics toolkit for GLOD netCDF files, LIME-specific LGLOD files, and SRF observations.
+    Reader and diagnostics toolkit for GLOD-based netCDF files.
     <br />
     <!--<a href="https://lime-esa.github.io/glodformat/"><strong>Explore the docs »</strong></a>-->
     <br />
@@ -97,7 +97,7 @@ Work in progress
 
 ## Roadmap
 
-- [ ] Support checking if an observation file is correctly represented by a SRF file
+- [ ] Fully support checking if an observation file is correctly represented by a SRF file
 - [ ] Add support for LIME Toolbox related formats
 
 ## Development Guide
@@ -158,7 +158,7 @@ Distributed under the LGPL-v3 License. See [LGPL v3](./LICENSE) for more informa
 
 ---
 
-<div align="center">
+<div align="center"mages/uva_sello.jpg">
 <a href="https://esa.int"><img src="./docs/images/esa.jpg" alt="ESA logo" width="22%"/></a><a href="https://uva.es"><img src="./docs/images/uva_sello.jpg" alt="Logo of UVa" width="22%"></a><a href="https://npl.co.uk"><img src="./docs/images/npl.jpg" alt="Logo of NPL" width="22%"></a><a href="https://vito.be" ><img src="./docs/images/vito.jpg" alt="Logo of VITO" width="22%"></a>
 </div>
 
