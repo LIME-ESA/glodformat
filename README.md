@@ -7,7 +7,7 @@
 <br />
 <div align="center">
   <a href="https://lime.uva.es">
-    <img src="./docs/images/glodformat_logo.png" alt="glodformat logo" height="80" style="height: 80px !important;">
+    <img src="https://raw.githubusercontent.com/LIME-ESA/glodformat/main/docs/images/glodformat_logo.png" alt="glodformat logo" height="80" style="height: 80px !important;">
   </a>
 
   <h3 align="center">glodformat</h3>
@@ -162,13 +162,6 @@ Distributed under the LGPL-v3 License. See [LGPL v3](./LICENSE) for more informa
 * [África Barreto](mailto:abarretov@aemet.es) - [AEMET](https://aemet.es)
 * [Agnieszka Bialek](mailto:agnieszka.bialek@npl.co.uk) - [NPL](https://npl.co.uk)
 * [Marc Bouvet](mailto:marc.bouvet@esa.int) - [ESA](https://esa.int)
-
----
-
-<div align="center"mages/uva_sello.jpg">
-<a href="https://esa.int"><img src="./docs/images/esa.jpg" alt="ESA logo" width="22%"/></a><a href="https://uva.es"><img src="./docs/images/uva_sello.jpg" alt="Logo of UVa" width="22%"></a><a href="https://npl.co.uk"><img src="./docs/images/npl.jpg" alt="Logo of NPL" width="22%"></a><a href="https://vito.be" ><img src="./docs/images/vito.jpg" alt="Logo of VITO" width="22%"></a>
-</div>
-
 
 [stars-shield]: https://img.shields.io/github/stars/LIME-ESA/glodformat.svg?style=for-the-badge
 [stars-url]: https://github.com/LIME-ESA/glodformat/stargazers
